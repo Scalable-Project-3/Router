@@ -76,6 +76,16 @@ class Router:
     def updateCS(self, name, content):
         self.content_store[name] = content
 
+    def forwardInterest(self, interest_name):
+        if interest_name in self.fib:
+            next_hops = self.fib[interest_name]
+            for next_hop in next_hops:
+                new_msg = "interest," + interest_name + "," + self.router_name
+                self.sendData(interest_name, new_msg, next_hop)
+        else:
+            # todo: need to do sth if no forwarding info for this interest
+            print("No forward info in FIB")
+
     def sendData(self, name, new_msg, dest_name=None):
         # new_resource_msg = "resource," + self.router_name + "," + resource_name + "," + resource_content
         if dest_name is None:
@@ -91,16 +101,6 @@ class Router:
             if dest_name in self.name_ip_map:
                 ip_port = self.name_ip_map[dest_name].split(':')
                 self.sender_sock.sendto(new_msg.encode(), (ip_port[0], int(ip_port[1])))
-
-    def forwardInterest(self, interest_name):
-        if interest_name in self.fib:
-            next_hops = self.fib[interest_name]
-            for next_hop in next_hops:
-                new_msg = "interest," + interest_name + "," + self.router_name
-                self.sendData(interest_name, new_msg, next_hop)
-        else:
-            # todo: need to do sth if no forwarding info for this interest
-            print("No forward info in FIB")
 
     # message format:
     # discover message: "discover,sender_name" stored in name_ip_map
