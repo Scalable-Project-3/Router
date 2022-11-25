@@ -1,8 +1,22 @@
 import socket
 import threading
+from cryptography.fernet import Fernet
 
 ROUTER_PORT = 33333
 DEVICE_PORT = 34333
+
+with open('mykey.key', 'rb') as mykey:
+    key = mykey.read()
+
+f = Fernet(key)
+
+
+def encrypt(original_msg):
+    return f.encrypt(original_msg)
+
+
+def decrypt(encrypted_msg):
+    return f.decrypt(encrypted_msg)
 
 
 class Router:
@@ -32,6 +46,7 @@ class Router:
             if interest_name in self.pit:
                 self.pit[interest_name].add(requester_name)
             else:
+                # create a new set for this interest
                 requester_list = {requester_name}
                 self.pit[interest_name] = requester_list
             # if the sender of this interest packet is an unknown host
@@ -58,23 +73,34 @@ class Router:
             return True
         return False
 
-    def updateCS(self, name, val):
-        self.content_store[name] = val
+    def updateCS(self, name, content):
+        self.content_store[name] = content
 
-    def sendData(self, resource_name, resource_val, dest_name=None):
-        new_resource_msg = "resource," + self.router_name + "," + resource_name + "," + resource_val
+    def sendData(self, name, new_msg, dest_name=None):
+        # new_resource_msg = "resource," + self.router_name + "," + resource_name + "," + resource_content
         if dest_name is None:
-            if resource_name in self.pit:
-                requester_names = self.pit[resource_name]
+            if name in self.pit:
+                requester_names = self.pit[name]
                 for requester in requester_names:
                     if requester in self.name_ip_map:
                         ip_port = self.name_ip_map[requester].split(":")
-                        self.sender_sock.sendto(new_resource_msg.encode(), (ip_port[0], int(ip_port[1])))
+                        self.sender_sock.sendto(new_msg.encode(), (ip_port[0], int(ip_port[1])))
             else:
                 print("Unknown requester, Store in CS...")
         else:
-            ip_port = self.name_ip_map[dest_name].split(':')
-            self.sender_sock.sendto(new_resource_msg.encode(), (ip_port[0], int(ip_port[1])))
+            if dest_name in self.name_ip_map:
+                ip_port = self.name_ip_map[dest_name].split(':')
+                self.sender_sock.sendto(new_msg.encode(), (ip_port[0], int(ip_port[1])))
+
+    def forwardInterest(self, interest_name):
+        if interest_name in self.fib:
+            next_hops = self.fib[interest_name]
+            for next_hop in next_hops:
+                new_msg = "interest," + interest_name + "," + self.router_name
+                self.sendData(interest_name, new_msg, next_hop)
+        else:
+            # todo: need to do sth if no forwarding info for this interest
+            print("No forward info in FIB")
 
     # message format:
     # discover message: "discover,sender_name" stored in name_ip_map
@@ -85,23 +111,24 @@ class Router:
         if msg:
             msg = msg.decode('utf-8')
             print('Received message: ', msg)
-            msg = msg.split(',')
-            if len(msg) == 2 and msg[0] == 'discover':
+            msg = msg.split('/')
+            if len(msg) >= 2 and msg[0] == 'discover':
                 self.updateNameIpMap(msg[1], addr)
-            elif len(msg) == 3 and msg[0] == 'interest':
+            elif len(msg) >= 3 and msg[0] == 'interest':
                 interest_name = msg[1]
                 if not self.isInCS(interest_name):
                     # if not hit CS
                     # check and update PIT
                     self.updatePIT(interest_name, msg[2], addr)
                     # todo: check FIB and forward the package
-
+                    self.forwardInterest(interest_name)
                 else:
                     # first update name ip map in case it doesn't exist
                     self.updateNameIpMap(msg[2], addr)
                     # if hit, directly return data
-                    self.sendData(interest_name, self.content_store[interest_name], msg[2])
-            elif len(msg) == 4 and msg[0] == 'resource':
+                    new_msg = "resource," + self.router_name + "," + msg[1] + "," + self.content_store[interest_name]
+                    self.sendData(interest_name, new_msg, msg[2])
+            elif len(msg) >= 4 and msg[0] == 'resource':
                 self.updateFIB(msg[1], msg[2], addr)
                 self.sendData(msg[2], msg[3])
                 self.updatePIT(msg[2], '', '', 'delete')
