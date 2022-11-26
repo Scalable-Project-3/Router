@@ -9,10 +9,10 @@ CONSUMER_PORT = 33533
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
 class Consumer:
-    def __init__(self,host):
+    def __init__(self, host):
         self.host = host
 
-    def Listen_device(self):
+    def listen_device(self):
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.bind((self.host, CONSUMER_PORT))
         while True:
@@ -29,9 +29,9 @@ class Consumer:
                 sock.sendto(message, ("127.0.0.1", 34333))
 
     def main(self):
-        listen_thread = threading.Thread(target=consumer.Listen_device())
+        listen_thread = threading.Thread(target=consumer.listen_device())
         listen_thread.start()
-        send_interest()
+        self.send_interest()
 
 if __name__ == '__main__':
     host = socket.gethostbyname(socket.gethostname())

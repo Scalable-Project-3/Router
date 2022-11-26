@@ -1,22 +1,8 @@
 import socket
 import threading
-from cryptography.fernet import Fernet
 
 ROUTER_PORT = 33333
 DEVICE_PORT = 34333
-
-with open('mykey.key', 'rb') as mykey:
-    key = mykey.read()
-
-f = Fernet(key)
-
-
-def encrypt(original_msg):
-    return f.encrypt(original_msg)
-
-
-def decrypt(encrypted_msg):
-    return f.decrypt(encrypted_msg)
 
 
 class Router:
@@ -35,6 +21,7 @@ class Router:
         self.content_store = {}
         # socket for sending msg
         self.sender_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.sender_sock.bind((self.host, DEVICE_PORT))
         # self.device = set()
 
     def updateNameIpMap(self, name, ipaddr):
@@ -76,6 +63,22 @@ class Router:
     def updateCS(self, name, content):
         self.content_store[name] = content
 
+    def forwardInterest(self, interest_name):
+        if interest_name in self.fib:
+            next_hops = self.fib[interest_name]
+            for next_hop in next_hops:
+                new_msg = "interest," + interest_name + "," + self.router_name
+                self.sendData(interest_name, new_msg, next_hop)
+        else:
+
+            # todo: need to do sth if no forwarding info for this interest
+            name_arr = interest_name.split('/')
+            if name_arr[0] in self.fib:
+                print(self.fib[name_arr[0]])
+                new_msg = 'interest,' + interest_name + ',' + self.router_name
+                self.sendData('', new_msg, name_arr[0])
+            print("No forward info in FIB")
+
     def sendData(self, name, new_msg, dest_name=None):
         # new_resource_msg = "resource," + self.router_name + "," + resource_name + "," + resource_content
         if dest_name is None:
@@ -84,23 +87,17 @@ class Router:
                 for requester in requester_names:
                     if requester in self.name_ip_map:
                         ip_port = self.name_ip_map[requester].split(":")
+                        print(ip_port)
+                        print(new_msg)
                         self.sender_sock.sendto(new_msg.encode(), (ip_port[0], int(ip_port[1])))
             else:
                 print("Unknown requester, Store in CS...")
         else:
             if dest_name in self.name_ip_map:
                 ip_port = self.name_ip_map[dest_name].split(':')
+                print(ip_port)
+                print(new_msg)
                 self.sender_sock.sendto(new_msg.encode(), (ip_port[0], int(ip_port[1])))
-
-    def forwardInterest(self, interest_name):
-        if interest_name in self.fib:
-            next_hops = self.fib[interest_name]
-            for next_hop in next_hops:
-                new_msg = "interest," + interest_name + "," + self.router_name
-                self.sendData(interest_name, new_msg, next_hop)
-        else:
-            # todo: need to do sth if no forwarding info for this interest
-            print("No forward info in FIB")
 
     # message format:
     # discover message: "discover,sender_name" stored in name_ip_map
@@ -111,9 +108,10 @@ class Router:
         if msg:
             msg = msg.decode('utf-8')
             print('Received message: ', msg)
-            msg = msg.split('/')
+            msg = msg.split(',')
             if len(msg) >= 2 and msg[0] == 'discover':
                 self.updateNameIpMap(msg[1], addr)
+                self.updateFIB(msg[1], msg[1], addr)
             elif len(msg) >= 3 and msg[0] == 'interest':
                 interest_name = msg[1]
                 if not self.isInCS(interest_name):
@@ -139,10 +137,10 @@ class Router:
             print('empty msg received')
 
     def listenToDevices(self):
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.bind((self.host, DEVICE_PORT))
+        # sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
         while True:
-            msg, addr = sock.recvfrom(1024)
+            msg, addr = self.sender_sock.recvfrom(1024)
             addr_str = addr[0] + ':' + str(addr[1])
             self.handleMsg(msg, addr_str)
 
