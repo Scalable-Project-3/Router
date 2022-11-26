@@ -37,12 +37,17 @@ def decrypt_with_aes(encrypted_msg, symmetric_key):
 def generate_aes_key():
     return Fernet.generate_key()
 
-def loadKeys():
-    with open('security/keys/publicKey.pem', 'rb') as p:
-        publicKey = rsa.PublicKey.load_pkcs1(p.read())
+
+def load_private_key():
     with open('security/keys/privateKey.pem', 'rb') as p:
         privateKey = rsa.PrivateKey.load_pkcs1(p.read())
-    return privateKey, publicKey
+    return privateKey
+
+
+def load_pub_key():
+    with open('security/keys/publicKey.pem', 'rb') as p:
+        publicKey = rsa.PublicKey.load_pkcs1(p.read())
+    return publicKey
 
 
 def generate_rsa_key_pair():
