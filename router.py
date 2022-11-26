@@ -5,19 +5,6 @@ from cryptography.fernet import Fernet
 ROUTER_PORT = 33333
 DEVICE_PORT = 34333
 
-with open('mykey.key', 'rb') as mykey:
-    key = mykey.read()
-
-f = Fernet(key)
-
-
-def encrypt(original_msg):
-    return f.encrypt(original_msg)
-
-
-def decrypt(encrypted_msg):
-    return f.decrypt(encrypted_msg)
-
 
 class Router:
 
