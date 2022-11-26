@@ -1,0 +1,21 @@
+resource message: "resource,sender_name,resource_name,val"
+only the 'val' will be encrypted
+
+authentication part (security center):
+    generate key pair (e-key, d-key)
+    dispatch e-key to producer and d-key to consumer respectively once requested
+
+
+consumer part:
+    first request d-key(encrypted by consumer's public key) from authentication.py
+    use its own private key to decrypt the d-key -> get the d-key
+    use the d-key(similar to private key) to decrypt ase key(encrypted by e-key(similar to pub key))
+    -> get the ase key
+    use the ase key to decrypt the resource(val) -> get the resource(val)
+
+
+producer part:
+    register in the authentication using certificate(pub_key of authentication) to encrypt own ase key then send it to authentication
+    first request e-key from authentication.py
+    using e-key to encrypt the ase key
+    send out the encrypted ase key + encrypted resource(val)
