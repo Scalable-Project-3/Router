@@ -5,7 +5,7 @@ import time
 import random
 
 ROUTER_PORT = 33333
-CONSUMER_PORT = 35333
+CONSUMER_PORT = 33533
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
 class Consumer:
@@ -20,9 +20,9 @@ class Consumer:
             addr_str = addr[0] + ':' + str(addr[1])
             print(msg)
 
-    def send_interest(self):
-        interest_name = ['farmer/area/1/cow/temperature', 'farmer/area/1/cow/speed', 'farmer/area/1/cow/heartbeat']
-        requester_name = ['farmer/area/1/cow', 'farmer/area/2/cow', 'farmer/area/3/cow']
+    def send_interest():
+        interest_name = ['Bob/Temperature', 'Alice/speed', 'Ben/pressure']
+        requester_name = ['diver/area/1/Bob', 'diver/area/2/Alice', 'diver/area/3/Ben']
         for Interest_Name in interest_name:
             for Requester_Name in requester_name:
                 message = f'interest,{Interest_Name},{Requester_Name}'.encode('utf-8')
