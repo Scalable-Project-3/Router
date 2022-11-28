@@ -11,6 +11,7 @@ from prompt_toolkit import prompt
 from prompt_toolkit.shortcuts import PromptSession
 import pandas as pd
 import csv
+import util
 
 ROUTER_PORT = 33333
 CONSUMER_PORT = 33533
@@ -20,12 +21,16 @@ class Consumer:
         self.host = host
 
     def listen_device(self):
+        key1= util.load_private_key('../device/privateKey.pem')
+        key2 = util.load_pub_key('../device/certificate.pem')
         try:
             sock.bind((self.host, CONSUMER_PORT))
             while True:
                 msg, addr = sock.recvfrom(1024)
-                print(msg)
-
+                # value1= util.encrypt_with_rsa(msg.decode('utf-8').split(',')[3].encode(),key2)
+                value2= msg.decode('utf-8').split(',')[3].encode()
+                print(util.decrypt_with_rsa(value2, key1))
+                break
         finally:
             sock.close()
             print('socket close')
