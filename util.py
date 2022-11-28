@@ -3,18 +3,18 @@ import rsa
 
 
 def sign(message, private_key):
-    return rsa.sign(message.encode('utf8'), private_key, 'SHA-1')
+    return rsa.sign(message, private_key, 'SHA-1')
 
 
 def verify(message, signature, pub_key):
     try:
-        return rsa.verify(message.encode('utf8'), signature, pub_key, ) == 'SHA-1'
+        return rsa.verify(message, signature, pub_key, ) == 'SHA-1'
     except:
         return False
 
 
 def encrypt_with_rsa(msg, pub_key):
-    return rsa.encrypt(msg.encode('utf8'), pub_key)
+    return rsa.encrypt(msg, pub_key)
 
 
 def decrypt_with_rsa(encrypted_msg, d_key):
@@ -29,8 +29,8 @@ def encrypt_with_aes(msg, aes_key):
     return f.encrypt(msg)
 
 
-def decrypt_with_aes(encrypted_msg, symmetric_key):
-    f = Fernet(symmetric_key)
+def decrypt_with_aes(encrypted_msg, aes_key):
+    f = Fernet(aes_key)
     return f.decrypt(encrypted_msg)
 
 
@@ -56,3 +56,7 @@ def generate_rsa_key_pair():
         p.write(publicKey.save_pkcs1('PEM'))
     with open('security/keys/privateKey.pem', 'wb') as p:
         p.write(privateKey.save_pkcs1('PEM'))
+
+
+if __name__ == '__main__':
+    generate_e_d_key()
