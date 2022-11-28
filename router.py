@@ -1,5 +1,8 @@
+#!./pj3-env/bin/python
+
 import socket
 import threading
+import sys, getopt
 
 ROUTER_PORT = 33333
 DEVICE_PORT = 34333
@@ -7,9 +10,10 @@ DEVICE_PORT = 34333
 
 class Router:
 
-    def __init__(self, host, port, router_name):
+    def __init__(self, host, port, device_port, router_name):
         self.host = host
         self.port = port
+        self.device_port = device_port
         self.router_name = router_name
         # name: ip:port
         self.name_ip_map = {}
@@ -21,8 +25,7 @@ class Router:
         self.content_store = {}
         # socket for sending msg
         self.sender_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.sender_sock.bind((self.host, DEVICE_PORT))
-        # self.device = set()
+        self.sender_sock.bind((self.host, self.device_port))
 
     def updateNameIpMap(self, name, ipaddr):
         if not name in self.name_ip_map:
@@ -70,8 +73,6 @@ class Router:
                 new_msg = "interest," + interest_name + "," + self.router_name
                 self.sendData(interest_name, new_msg, next_hop)
         else:
-
-            # todo: need to do sth if no forwarding info for this interest
             name_arr = interest_name.split('/')
             if name_arr[0] in self.fib:
                 print(self.fib[name_arr[0]])
@@ -118,7 +119,6 @@ class Router:
                     # if not hit CS
                     # check and update PIT
                     self.updatePIT(interest_name, msg[2], addr)
-                    # todo: check FIB and forward the package
                     self.forwardInterest(interest_name)
                 else:
                     # first update name ip map in case it doesn't exist
@@ -128,7 +128,8 @@ class Router:
                     self.sendData(interest_name, new_msg, msg[2])
             elif len(msg) >= 4 and msg[0] == 'resource':
                 self.updateFIB(msg[1], msg[2], addr)
-                self.sendData(msg[2], msg[3])
+                new_msg = "resource," + self.router_name + "," + msg[2] + "," + msg[3]
+                self.sendData(msg[2], new_msg)
                 self.updatePIT(msg[2], '', '', 'delete')
                 self.updateCS(msg[2], msg[3])
             else:
@@ -137,20 +138,48 @@ class Router:
             print('empty msg received')
 
     def listenToDevices(self):
-        # sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-
         while True:
             msg, addr = self.sender_sock.recvfrom(1024)
             addr_str = addr[0] + ':' + str(addr[1])
             self.handleMsg(msg, addr_str)
 
 
-def main():
-    host = socket.gethostbyname(socket.gethostname())
-    router = Router(host, ROUTER_PORT, 'farmer/area/1')
+def main(argv):
+    host = ''
+    port = ''
+    device_port = ''
+    router_name = ''
+
+    try:
+        opts, args = getopt.getopt(argv, "ho:p:d:n:", ["host=", "port=", "device_port=", "name="])
+    except getopt.GetoptError:
+        print('router.py -o <host> -p <port> -d <device port> -n <router name>')
+        sys.exit(2)
+    for opt, arg in opts:
+        if opt == '-h':
+            print("router.py -o <host> -p <port> -d <device port> -n <router name>")
+            sys.exit()
+        elif opt in ("-o", "--host"):
+            host = arg
+        elif opt in ("-p", "--port"):
+            port = arg
+        elif opt in ("-d", "--device"):
+            device_port = arg
+        elif opt in ("-n", "--name"):
+            router_name = arg
+    if host == '' or port == '' or router_name == '':
+        print("use command line:", "router.py -o <host> -p <port> -d <device port> -n <router name>")
+        sys.exit()
+
+    print('host: ', host)
+    print('port: ', port)
+    print('device port: ', device_port)
+    print('router name: ', router_name)
+
+    router = Router(host, int(port), int(device_port), router_name)
     listen_thread = threading.Thread(target=router.listenToDevices())
     listen_thread.start()
 
 
 if __name__ == '__main__':
-    main()
+    main(sys.argv[1:])
