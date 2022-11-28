@@ -15,6 +15,8 @@ class Router:
         self.port = port
         self.device_port = device_port
         self.router_name = router_name
+        self.router_name_end_idx = len(self.router_name)
+
         # name: ip:port
         self.name_ip_map = {}
         # interest_name: {requester_name}
@@ -26,6 +28,17 @@ class Router:
         # socket for sending msg
         self.sender_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sender_sock.bind((self.host, self.device_port))
+        # with open('config/config.txt', 'rb') as f:
+        #     lines = f.readlines()
+        #     for line in lines:
+        #         info = line.strip().split(',')
+        #         if info[1] == self.router_name:
+        #             continue
+        #
+        #         other_router_addr = info[0]
+        #         other_router_name = info[1]
+        #         self.name_ip_map[other_router_name] = other_router_addr
+        #         self.fib[other_router_name] = other_router_name
 
     def updateNameIpMap(self, name, ipaddr):
         if not name in self.name_ip_map:
@@ -33,6 +46,7 @@ class Router:
 
     def updatePIT(self, interest_name, requester_name, addr, operation='update'):
         if operation == 'update':
+            # interest_name: Bob/Temperature; requester_name: control center
             if interest_name in self.pit:
                 self.pit[interest_name].add(requester_name)
             else:
@@ -43,7 +57,8 @@ class Router:
             # update the name ip map
             self.updateNameIpMap(requester_name, addr)
         elif operation == 'delete':
-            self.pit.pop(interest_name)
+            if interest_name in self.pit:
+                self.pit.pop(interest_name)
 
     def updateFIB(self, sender_name, resource_name, addr):
         if resource_name in self.fib:
@@ -66,6 +81,8 @@ class Router:
     def updateCS(self, name, content):
         self.content_store[name] = content
 
+    # interest name: Bob/temperature
+    # interest format: "interest,interest_name,requester_name"
     def forwardInterest(self, interest_name):
         if interest_name in self.fib:
             next_hops = self.fib[interest_name]
@@ -73,12 +90,21 @@ class Router:
                 new_msg = "interest," + interest_name + "," + self.router_name
                 self.sendData(interest_name, new_msg, next_hop)
         else:
+            # prefix matching
             name_arr = interest_name.split('/')
-            if name_arr[0] in self.fib:
-                print(self.fib[name_arr[0]])
-                new_msg = 'interest,' + interest_name + ',' + self.router_name
-                self.sendData('', new_msg, name_arr[0])
-            print("No forward info in FIB")
+            final_match = ''
+            tmp = ''
+            for name in name_arr:
+                tmp = tmp + name
+                if tmp not in self.fib:
+                    break
+                final_match = tmp
+                tmp = tmp + '/'
+
+            new_msg = 'interest,' + self.router_name + '/' + interest_name + ',' + self.router_name
+            self.sendData('', new_msg, final_match)
+
+        print("No forward info in FIB")
 
     def sendData(self, name, new_msg, dest_name=None):
         # new_resource_msg = "resource," + self.router_name + "," + resource_name + "," + resource_content
@@ -100,6 +126,22 @@ class Router:
                 print(new_msg)
                 self.sender_sock.sendto(new_msg.encode(), (ip_port[0], int(ip_port[1])))
 
+    def getAreaPrefix(self, full_interest):
+        name_arr = full_interest.split('/')
+        area_prefix = ''
+        for i in range(3):
+            area_prefix = area_prefix + name_arr[i] + '/'
+
+        return area_prefix[:-1]
+
+    # def forward2Router(self, msg, addr):
+    #     interest_name, requester_name = msg[1][self.router_name_end_idx + 1:], msg[2]
+    #     # msg[1]: diver/area/{num}/Bob/Temperature
+    #     # msg[2]: control center || diver/area/{num}
+    #     forwarded_router = self.getAreaPrefix(msg[1])
+    #     self.updatePIT(interest_name, requester_name, addr)
+    #     self.forwardInterest()
+
     # message format:
     # discover message: "discover,sender_name" stored in name_ip_map
     # interest message: "interest,interest_name,requester_name" stored in pit
@@ -111,27 +153,35 @@ class Router:
             print('Received message: ', msg)
             msg = msg.split(',')
             if len(msg) >= 2 and msg[0] == 'discover':
-                self.updateNameIpMap(msg[1], addr)
-                self.updateFIB(msg[1], msg[1], addr)
+                device_name = msg[1].lower()
+                self.updateNameIpMap(device_name, addr)
+                self.updateFIB(device_name, device_name, addr)
             elif len(msg) >= 3 and msg[0] == 'interest':
-                interest_name = msg[1]
+                # if self.getAreaPrefix(msg[1]) != self.router_name:
+                #     self.forward2Router(msg, addr)
+                # else:
+                interest_name, requester_name = msg[1][self.router_name_end_idx + 1:].lower(), msg[2].lower()
+                # interest_name: Bob/Temperature
+                # requester_name: control center
                 if not self.isInCS(interest_name):
-                    # if not hit CS
-                    # check and update PIT
-                    self.updatePIT(interest_name, msg[2], addr)
+                    # if not hit CS, check and update PIT
+                    self.updatePIT(interest_name, requester_name, addr)
                     self.forwardInterest(interest_name)
                 else:
                     # first update name ip map in case it doesn't exist
-                    self.updateNameIpMap(msg[2], addr)
+                    self.updateNameIpMap(requester_name, addr)
                     # if hit, directly return data
                     new_msg = "resource," + self.router_name + "," + msg[1] + "," + self.content_store[interest_name]
-                    self.sendData(interest_name, new_msg, msg[2])
+                    self.sendData(interest_name, new_msg, requester_name)
             elif len(msg) >= 4 and msg[0] == 'resource':
-                self.updateFIB(msg[1], msg[2], addr)
-                new_msg = "resource," + self.router_name + "," + msg[2] + "," + msg[3]
-                self.sendData(msg[2], new_msg)
-                self.updatePIT(msg[2], '', '', 'delete')
-                self.updateCS(msg[2], msg[3])
+                # resource,Bob,Bob/Temperature,37
+                sender_name, resource_name, content = msg[1].lower(), msg[2].lower(), msg[3]
+                self.updateFIB(sender_name, resource_name, addr)
+                # resource,diver/area/1,diver/area/1/Bob/Temperature,37
+                new_msg = "resource," + self.router_name + "," + self.router_name + '/' + resource_name + "," + content
+                self.sendData(resource_name, new_msg)
+                self.updatePIT(resource_name, '', '', 'delete')
+                self.updateCS(resource_name, content)
             else:
                 print('cannot recognize this message')
         else:
