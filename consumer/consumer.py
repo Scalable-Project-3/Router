@@ -4,11 +4,7 @@ import random
 import sys
 import threading
 import asyncio
-from prompt_toolkit.patch_stdout import patch_stdout
-from prompt_toolkit.application import get_app
-from prompt_toolkit.key_binding import KeyBindings
-from prompt_toolkit import prompt
-from prompt_toolkit.shortcuts import PromptSession
+
 import pandas as pd
 import csv
 import util
@@ -40,14 +36,10 @@ class Consumer:
 
     async def send_interest(self):
         isLoop=True;
-        kb=KeyBindings()
-        @kb.add('c-c')
         async def _(event):
             nonlocal isLoop
             isLoop=False
             event.app.exit()
-
-        session = PromptSession()
         while isLoop:
             try:
                 with open('./interest.csv', 'r') as f:
@@ -75,11 +67,7 @@ class Consumer:
         head_row = pd.read_csv('./configure.csv', nrows=0)
         head_row_list = list(head_row)
         csv_result = pd.read_csv('./configure.csv', usecols=head_row_list)
-        with patch_stdout():
-            try:
-                await self.send_interest()
-            finally:
-                pass
+        await self.send_interest()
 
     def run(self):
         try:
