@@ -27,16 +27,16 @@ class Consumer:
             sock.bind((self.host, CONSUMER_PORT))
             while True:
                 msg, addr = sock.recvfrom(1024)
-                # value1= util.encrypt_with_rsa(msg.decode('utf-8').split(',')[3].encode(),key2)
+                value1= util.encrypt_with_rsa(msg.decode('utf-8').split(',')[3].encode(),key2)
                 value2= msg.decode('utf-8').split(',')[3].encode()
-                print(util.decrypt_with_rsa(value2, key1))
+                print(util.decrypt_with_rsa(value1, key1))
                 break
         finally:
             sock.close()
             print('socket close')
 
-    def test(self, interest_name):
-        sock.sendto(interest_name.encode(), ("127.0.0.1", 34333))
+    def test(self, msg):
+        sock.sendto(msg, ("127.0.0.1", 34333))
 
     async def send_interest(self):
         isLoop=True;
@@ -50,21 +50,26 @@ class Consumer:
         session = PromptSession()
         while isLoop:
             try:
-                interest_name = await session.prompt_async('>>', key_bindings=kb)
-                with open('./configure.csv', 'r') as f:
+                with open('./interest.csv', 'r') as f:
                     reader = csv.reader(f)
-                    console=interest_name.split(',')[1].split('/')[0]+'/'+interest_name.split(',')[1].split('/')[1]+'/'+interest_name.split(',')[1].split('/')[2]
                     for row in reader:
-                        if (row[0]== console):
-                            msg = bytes(interest_name, 'utf-8')
-                            print(str(row[1]))
-                            sock.sendto(msg, (str(row[1]), 34333))
-                print('send interest_name: %s' % interest_name)
-                t = threading.Thread(target = self.test, args = (interest_name,))
-                t.setDaemon(True)
-                t.start()
+                        interest_name=row
+                        time.sleep(5)
+                        print(interest_name[0].split('/')[0]+'/'+interest_name[0].split('/')[1]+'/'+interest_name[0].split('/')[2])
+                        with open('./configure.csv', 'r') as f:
+                            reader = csv.reader(f)
+                            console=interest_name[0].split('/')[0]+'/'+interest_name[0].split('/')[1]+'/'+interest_name[0].split('/')[2]
+                            for row in reader:
+                                if (row[0]== console):
+                                    msg = bytes('interest,'.encode())+bytes(str(interest_name[0]).encode())+bytes(',consumer'.encode())
+                                    print(str(row[1]))
+                                    sock.sendto(msg, ('127.0.0.1', 34333))
+                        print('send interest_name: %s' % msg.decode('utf-8'))
+                        t = threading.Thread(target = self.test, args = (msg,))
+                        t.setDaemon(True)
+                        t.start()
             except KeyboardInterrupt:
-                return
+                 return
 
     async def main(self):
         head_row = pd.read_csv('./configure.csv', nrows=0)
