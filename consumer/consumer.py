@@ -31,8 +31,6 @@ class Consumer:
             sock.close()
             print('socket close')
 
-    def test(self, msg):
-        sock.sendto(msg, ("127.0.0.1", 34333))
 
     async def send_interest(self):
         isLoop=True;
@@ -64,10 +62,7 @@ class Consumer:
                  return
 
     async def main(self):
-        head_row = pd.read_csv('./configure.csv', nrows=0)
-        head_row_list = list(head_row)
-        csv_result = pd.read_csv('./configure.csv', usecols=head_row_list)
-        await self.send_interest()
+        self.send_interest()
 
     def run(self):
         try:
